@@ -210,3 +210,55 @@ messages.forEach(message => {
 });
 
 console.log('🎉 Happy Birthday! Made with ❤️');
+
+// Added: robust mobile-friendly audio start tied to user gesture
+(function() {
+    const btn = document.getElementById('musicButton'); // [`musicButton`](index.html)
+    const audioEl = document.getElementById('birthday-audio'); // [`birthday-audio`](index.html)
+    let audioCtx = null;
+    let source = null;
+
+    if (!btn || !audioEl) return;
+
+    function initAudioAndToggle(evt) { // [`initAudioAndToggle`](script.js)
+        // Prevent duplicate touch/click events on some devices
+        if (evt && evt.type === 'touchstart') evt.preventDefault();
+
+        // Create AudioContext and connect the media element on first gesture
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            try {
+                source = audioCtx.createMediaElementSource(audioEl);
+                source.connect(audioCtx.destination);
+            } catch (e) {
+                // Some browsers may block createMediaElementSource until allowed; still try to play
+                console.warn('MediaElementSource error:', e);
+            }
+        }
+
+        // Resume suspended context (common on iOS/Chrome)
+        if (audioCtx && audioCtx.state === 'suspended') {
+            audioCtx.resume().catch(() => {});
+        }
+
+        if (audioEl.paused) {
+            // Ensure playsinline and unmuted
+            audioEl.playsInline = true;
+            audioEl.muted = false;
+            const p = audioEl.play();
+            if (p && p.catch) p.catch(err => console.warn('Play failed:', err));
+            btn.textContent = '⏸️ Pause Birthday Song';
+        } else {
+            audioEl.pause();
+            btn.textContent = '🎵 Play Birthday Song';
+        }
+
+        // Remove touchstart listener after first real interaction (optional)
+        // so it doesn't fire twice on some devices
+        btn.removeEventListener('touchstart', initAudioAndToggle);
+    }
+
+    // Use both touchstart and click to cover mobile + desktop
+    btn.addEventListener('click', initAudioAndToggle);
+    btn.addEventListener('touchstart', initAudioAndToggle, { passive: false });
+})();
